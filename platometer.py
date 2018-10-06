@@ -469,11 +469,11 @@ if __name__ == '__main__':
         for n_chunk, ix_chunk in enumerate(chunk_starts):
 
             ix_chunk_start = ix_chunk
-            ix_chunk_stop = np.min([ix_chunk+chunk_size-1, nr_jpg_files])
+            ix_chunk_stop = np.min([ix_chunk+chunk_size-1, nr_jpg_files-1])
             
             print('Chunk %d, start %d, stop %d' % (n_chunk, ix_chunk_start, ix_chunk_stop))
 
-            this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i]} for i in np.arange(ix_chunk_start, ix_chunk_stop)]
+            this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i]} for i in np.arange(ix_chunk_start, ix_chunk_stop+1)]
             
             print(len(this_jpg_files_dict))
 
