@@ -36,7 +36,6 @@ class Platometer:
 
         self.path_to_image_file = path_to_image_file
         self.verbose = verbose
-
         self.im = plt.imread(path_to_image_file)
 
         self.im_center = None
@@ -458,7 +457,7 @@ if __name__ == '__main__':
             os.makedirs(data_folder)
 
         # Get list of JPG files in the folder
-        jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f)) and f.lower().endswith('jpg')]
+        jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f)) and f.lower().endswith('jpg') and os.path.getsize(os.path.join(folder,f)) > 0]
         nr_jpg_files = len(jpg_files)
         jpg_files_id = np.arange(nr_jpg_files)
 
