@@ -3,10 +3,13 @@ import dill as pickle
 import pandas as pd
 
 
-def save_to_p(data, output_file=None):
+def save_to_p(data, output_file=None, verbose=False):
 
     if not output_file:
         output_file = os.path.join(os.getcwd(), 'output.p')
+
+    if verbose:
+        print('Saving to %s' % output_file)
 
     with open(output_file, 'wb') as handle:
         pickle.dump(data, handle)
