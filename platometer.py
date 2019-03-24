@@ -20,6 +20,7 @@ import pandas as pd
 import multiprocessing as mp
 import scipy.optimize
 
+from os.path import expanduser
 from scipy.signal import medfilt2d
 from scipy import ndimage as ndi
 from sklearn.mixture import GaussianMixture
@@ -52,32 +53,36 @@ class Platometer:
         # DataFrame with final output
         self.colony_data = None
 
-    def get_path_to_output_file(self, extension=None):
+    def get_path_to_output_file(self, path='', extension=''):
 
-        file_name = os.path.basename(self.path_to_image_file)
-        parent_folder = os.path.dirname(os.path.dirname(self.path_to_image_file))
-        data_folder = os.path.join(parent_folder, '02_data')
-
-        if not os.path.exists(data_folder):
-            os.makedirs(data_folder)
-
-        if extension:
-            path_to_output_file = os.path.join(data_folder, file_name + extension)
+        if path:
+            path_to_output_file = path.replace('~', expanduser('~'))
         else:
-            path_to_output_file = data_folder
+            path_to_output_file = self.path_to_image_file + extension
+
+        already_exists = os.path.isfile(path_to_output_file)
+        if already_exists:
+            raise FileExistsError(('File %s already exists. '
+                                   'Please specify a different path or a different extension.' % path_to_output_file))
 
         return path_to_output_file
 
-    def save(self):
+    def save(self, path='', verbose=False):
 
-        path_to_p_file = self.get_path_to_output_file('.p')
+        path_to_p_file = self.get_path_to_output_file(path=path, extension='.p')
+
+        if verbose:
+            print('Saving to %s.' % path_to_p_file)
 
         with open(path_to_p_file, 'wb') as file_handle:
             pickle.dump(self, file_handle)
 
-    def print(self):
+    def print(self, path='', verbose=False):
 
-        path_to_dat_file = self.get_path_to_output_file('.dat')
+        path_to_dat_file = self.get_path_to_output_file(path=path, extension='.dat')
+
+        if verbose:
+            print('Saving to %s.' % path_to_dat_file)
 
         self.colony_data['circularity'] = np.nan
         self.colony_data['flags'] = np.nan
@@ -405,7 +410,9 @@ def estimate_foreground_by_adaptive_thresholding(im_gray_trimmed, block_size=45)
 
 
 def run_platometer(image, save_to_file=False, verbose=True):
-    p = Platometer(image['path'], verbose=verbose)
+
+    image_path = image['path'].replace('~', expanduser('~'))
+    p = Platometer(image_path, verbose=verbose)
 
     p.gray_and_trim()
     p.detect_colonies()
@@ -436,28 +443,32 @@ if __name__ == '__main__':
     start = time.time()
 
     parser = argparse.ArgumentParser(description='Process plates')
-    parser.add_argument('path_to_jpg_list', metavar='path_to_jpg_list', type=str, help='Path to the file containing the list of jpgs to process')
+    parser.add_argument('path_to_folder_list', metavar='path_to_folder_list', type=str,
+                        help='Path to the file containing the list of folders to process')
 
     args = parser.parse_args()
     
     nr_processes = mp.cpu_count()
 
-    folders = pd.read_table(args.path_to_jpg_list, header=None)
+    folders = pd.read_table(args.path_to_folder_list, header=None)
 
     for folder in folders[0]:
 
-        print('Processing %s' % folder)
+        folder = folder.replace('~', expanduser('~'))
 
-        # Get path to the processed data folder
-        parent_folder = os.path.dirname(args.path_to_jpg_list)
-        sub_folder = '/'.join(folder.split('/')[4:])
-        data_folder = os.path.join(parent_folder, sub_folder)
+        print('\nProcessing %s' % folder)
+
+        # Get path to the folder to contain processed data
+        current_date = datetime.datetime.today().strftime('%Y%m%d')
+        sub_folder = 'platometer_' + current_date
+        data_folder = os.path.join(folder, sub_folder)
         
         if not os.path.exists(data_folder):
             os.makedirs(data_folder)
 
         # Get list of JPG files in the folder
-        jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f)) and f.lower().endswith('jpg') and os.path.getsize(os.path.join(folder,f)) > 0]
+        jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))
+                     and f.lower().endswith('jpg') and os.path.getsize(os.path.join(folder, f)) > 0]
         nr_jpg_files = len(jpg_files)
         jpg_files_id = np.arange(nr_jpg_files)
 
@@ -474,7 +485,7 @@ if __name__ == '__main__':
 
             this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i]} for i in np.arange(ix_chunk_start, ix_chunk_stop+1)]
             
-            print(len(this_jpg_files_dict))
+            print('Number of images in this chunk: %d' % len(this_jpg_files_dict))
 
             pool = mp.Pool(processes=nr_processes)
 
@@ -501,11 +512,11 @@ if __name__ == '__main__':
 
         # Save all data
         path_to_all_data_file = os.path.join(data_folder, 'all_data.p')
-        save_to_p(all_data, path_to_all_data_file)
+        save_to_p(all_data, path_to_all_data_file, verbose=True)
         
         # Save the file_id to path map
         jpg_map = pd.DataFrame(data={'path': jpg_files, 'file_id': jpg_files_id})
         path_to_jpg_map_file = os.path.join(data_folder, 'jpg_map.p')
-        save_to_p(jpg_map, path_to_jpg_map_file)
+        save_to_p(jpg_map, path_to_jpg_map_file, verbose=True)
 
 
