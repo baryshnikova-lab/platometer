@@ -436,11 +436,22 @@ if __name__ == '__main__':
     start = time.time()
 
     parser = argparse.ArgumentParser(description='Process plates')
-    parser.add_argument('path_to_jpg_list', metavar='path_to_jpg_list', type=str, help='Path to the file containing the list of jpgs to process')
+    parser.add_argument('path_to_jpg_list', metavar='path_to_jpg_list', type=str,
+                        help='Path to the file containing the list of jpgs to process')
+    parser.add_argument('--chunk_size', metavar='chunk_size', type=int, default=100,
+                        help='Number of images per chunk (default=100)')
+    parser.add_argument('--nr_processes', metavar='nr_processes', type=int,
+                        help='Number of cores to use (default: all available)')
 
     args = parser.parse_args()
+
+    chunk_size = 100
+    if args.chunk_size:
+        chunk_size = args.chunk_size
     
     nr_processes = mp.cpu_count()
+    if args.nr_processes:
+        nr_processes = args.nr_processes
 
     folders = pd.read_csv(args.path_to_jpg_list, sep='\t', header=None)
 
@@ -462,7 +473,6 @@ if __name__ == '__main__':
         jpg_files_id = np.arange(nr_jpg_files)
 
         # Break the list into smaller chunks of 100 images and process the chunks sequentially
-        chunk_size = 100
         chunk_starts = np.arange(0, nr_jpg_files, chunk_size)
 
         for n_chunk, ix_chunk in enumerate(chunk_starts):
