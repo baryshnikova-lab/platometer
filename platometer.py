@@ -442,7 +442,7 @@ if __name__ == '__main__':
     
     nr_processes = mp.cpu_count()
 
-    folders = pd.read_table(args.path_to_jpg_list, header=None)
+    folders = pd.read_csv(args.path_to_jpg_list, sep='\t', header=None)
 
     for folder in folders[0]:
 

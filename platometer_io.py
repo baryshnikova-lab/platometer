@@ -18,6 +18,7 @@ def load(file_path, v=3, verbose=True):
     # Loads all objects from a pickle or a HDF5 file
     :param file_path: local path to the input file
     :param v: python version
+    :param verbose:
     :return: contents of the input file
     """
 
