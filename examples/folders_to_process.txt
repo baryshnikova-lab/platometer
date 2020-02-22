@@ -1,0 +1,2 @@
+~/Lab/Utils/Python/Images/platometer/examples/image_examples1/
+~/Lab/Utils/Python/Images/platometer/examples/image_examples2/

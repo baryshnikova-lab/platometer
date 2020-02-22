@@ -1,7 +1,6 @@
 platometer_env/
 __pycache__/
-README.md
-examples/
-requirements.txt
 
 *.ipynb
+*.sh
+
