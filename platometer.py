@@ -105,14 +105,29 @@ class Platometer:
         col_avg = np.nanmean(im_gray, axis=0)
 
         # Find the positions of colony centers by fitting a sinusoid to the row and col averages
-        self.fit_row = fit_sin(np.arange(len(row_avg)), row_avg, guess_freq=1/45)
-        self.fit_col = fit_sin(np.arange(len(col_avg)), col_avg, guess_freq=1/45)
+        # self.fit_row = fit_sin(np.arange(len(row_avg)), row_avg, guess_freq=1/45)
+        # self.fit_col = fit_sin(np.arange(len(col_avg)), col_avg, guess_freq=1/45)
+
+        self.fit_row = fit_sin(np.arange(len(row_avg)), row_avg)
+        self.fit_col = fit_sin(np.arange(len(col_avg)), col_avg)
 
         row_pxl = np.arange(len(row_avg))
         col_pxl = np.arange(len(col_avg))
 
+        # Middle 50% of the plate
+        row_pxl_mid = np.percentile(row_pxl, [25, 75]).astype(int)
+        col_pxl_mid = np.percentile(col_pxl, [25, 75]).astype(int)
+
+        row_pxl_mid_range = np.arange(row_pxl_mid[0],row_pxl_mid[1])
+        col_pxl_mid_range = np.arange(col_pxl_mid[0],col_pxl_mid[1])
+
         row_avg_fit = self.fit_row['fitfunc'](row_pxl)
         col_avg_fit = self.fit_col['fitfunc'](col_pxl)
+
+        row_fit_error = np.sqrt(np.sum(np.square(row_avg[row_pxl_mid_range] - row_avg_fit[row_pxl_mid_range])))
+        col_fit_error = np.sqrt(np.sum(np.square(col_avg[col_pxl_mid_range] - col_avg_fit[col_pxl_mid_range])))
+
+        print('%s\n%.3f\t%.3f\n' % (self.path_to_image_file, row_fit_error, col_fit_error))
 
         # Define the expected size of a window containing 32 rows or 48 columns
         w_row = np.ceil(self.fit_row['period'] * 32).astype(int)
@@ -407,10 +422,13 @@ def estimate_foreground_by_adaptive_thresholding(im_gray_trimmed, block_size=45)
 def run_platometer(image, save_to_file=False, verbose=True):
     p = Platometer(image['path'], verbose=verbose)
 
-    p.gray_and_trim()
-    p.detect_colonies()
-    p.measure_colony_sizes()
-#     p.test()
+    try:
+        p.gray_and_trim()
+        p.detect_colonies()
+        p.measure_colony_sizes()
+    #     p.test()
+    except RuntimeError:
+        print('RuntimeError with processing %s. Moving on...' % image['path'])
 
     # Saves the object to pickle
     if save_to_file:
