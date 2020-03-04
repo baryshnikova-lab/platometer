@@ -407,10 +407,13 @@ def estimate_foreground_by_adaptive_thresholding(im_gray_trimmed, block_size=45)
 def run_platometer(image, save_to_file=False, verbose=True):
     p = Platometer(image['path'], verbose=verbose)
 
-    p.gray_and_trim()
-    p.detect_colonies()
-    p.measure_colony_sizes()
-#     p.test()
+    try:
+        p.gray_and_trim()
+        p.detect_colonies()
+        p.measure_colony_sizes()
+        #     p.test()
+    except RuntimeError:
+        print('RuntimeError with processing %s. Moving on...' % image['path'])
 
     # Saves the object to pickle
     if save_to_file:
@@ -420,13 +423,15 @@ def run_platometer(image, save_to_file=False, verbose=True):
 
 
 def run_platometer_batch(image, save_to_file=False, verbose=False):
-    
+
     plate = run_platometer(image, verbose=verbose)
 
     colony_data = plate.get_colony_data()
-    cols = set(image.keys()) - set(['path'])
-    for col in cols:
-        colony_data[col] = image[col]
+
+    if isinstance(colony_data, pd.DataFrame):
+        cols = set(image.keys()) - set(['path'])
+        for col in cols:
+            colony_data[col] = image[col]
 
     return colony_data
 
@@ -480,25 +485,26 @@ if __name__ == '__main__':
             ix_chunk_start = ix_chunk
             ix_chunk_stop = np.min([ix_chunk+chunk_size-1, nr_jpg_files-1])
             
-            print('Chunk %d, start %d, stop %d' % (n_chunk, ix_chunk_start, ix_chunk_stop))
+            print('Chunk %d of %d, start %d, stop %d' % (n_chunk, len(chunk_starts), ix_chunk_start, ix_chunk_stop))
 
             this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i]} for i in np.arange(ix_chunk_start, ix_chunk_stop+1)]
-            
-            print(len(this_jpg_files_dict))
-
-            pool = mp.Pool(processes=nr_processes)
-
             chunk_data = pd.DataFrame()
 
-            for res in pool.map_async(run_platometer_batch, this_jpg_files_dict).get():
-                if res.shape[0] > 0:
-                    chunk_data = chunk_data.append(res, ignore_index=True)
+            if nr_processes > 1:
+                pool = mp.Pool(processes=nr_processes)
+                for res in pool.map_async(run_platometer_batch, this_jpg_files_dict).get():
+                    if res.shape[0] > 0:
+                        chunk_data = chunk_data.append(res, ignore_index=True)
+            else:
+                for im in this_jpg_files_dict:
+                    chunk_data = chunk_data.append(run_platometer_batch(im), ignore_index=True)
 
             # Temporarily save the chunk data
             path_to_this_chunk_file = os.path.join(data_folder, format('chunk%d_data.p' % n_chunk))
             save_to_p(chunk_data, path_to_this_chunk_file)
 
-            print('Chunk %d of %d. Execution time: %.2f seconds' % (n_chunk, len(chunk_starts), time.time() - start))
+            print('Execution time: %.2f seconds' % (time.time()-start))
+            start = time.time()
 
         # Now merge all chunks and delete the temp files
         all_data = pd.DataFrame()
