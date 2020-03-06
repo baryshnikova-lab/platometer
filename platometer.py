@@ -32,11 +32,13 @@ from platometer_utils import *
 
 class Platometer:
 
-    def __init__(self, path_to_image_file, verbose=True):
+    def __init__(self, path_to_image_file, plate_format=np.array([32, 48]),
+                 verbose=True):
 
         self.path_to_image_file = path_to_image_file
         self.verbose = verbose
         self.im = plt.imread(path_to_image_file)
+        self.n_rows, self.n_cols = plate_format
 
         self.im_center = None
         self.fit_row = None
@@ -131,9 +133,9 @@ class Platometer:
         #
         # print('%s\n%.3f\t%.3f\n' % (self.path_to_image_file, row_fit_error, col_fit_error))
 
-        # Define the expected size of a window containing 32 rows or 48 columns
-        w_row = np.ceil(self.fit_row['period'] * 32).astype(int)
-        w_col = np.ceil(self.fit_col['period'] * 48).astype(int)
+        # Define the expected size of a window containing the expected number of rows or columns
+        w_row = np.ceil(self.fit_row['period'] * self.n_rows).astype(int)
+        w_col = np.ceil(self.fit_col['period'] * self.n_cols).astype(int)
 
         # Find the boundaries of the plate (when plate is not centered within the image)
         plate_row_boundaries = [np.min(np.nonzero(row_avg > 100)), np.max(np.nonzero(row_avg > 100))]
@@ -186,16 +188,18 @@ class Platometer:
         [colony_col_pxl, _] = merge_colonies(colony_col_pxl)
         [colony_row_pxl, _] = merge_colonies(colony_row_pxl)
 
-        # --- Only include the middle 32 rows (just in case more than 32 peaks are detected)
+        # --- Only include the middle n_rows (just in case we detect more peaks than expected rows)
+        mid_row = int(self.n_rows/2)
         colony_distance_from_center = self.im_center[0] - colony_row_pxl
-        row_right_side = np.sort(-colony_distance_from_center[colony_distance_from_center < 0])[0:16]
-        row_left_side = np.sort(colony_distance_from_center[colony_distance_from_center > 0])[0:16]
+        row_right_side = np.sort(-colony_distance_from_center[colony_distance_from_center < 0])[0:mid_row]
+        row_left_side = np.sort(colony_distance_from_center[colony_distance_from_center > 0])[0:mid_row]
         colony_row_pxl = np.sort(self.im_center[0] - np.concatenate((row_left_side, -row_right_side), axis=0)).astype(int)
 
         # --- Only include the middle 48 columns (just in case more than 48 peaks are detected)
+        mid_col = int(self.n_cols/2)
         colony_distance_from_center = self.im_center[1] - colony_col_pxl
-        col_right_side = np.sort(-colony_distance_from_center[colony_distance_from_center < 0])[0:24]
-        col_left_side = np.sort(colony_distance_from_center[colony_distance_from_center > 0])[0:24]
+        col_right_side = np.sort(-colony_distance_from_center[colony_distance_from_center < 0])[0:mid_col]
+        col_left_side = np.sort(colony_distance_from_center[colony_distance_from_center > 0])[0:mid_col]
         colony_col_pxl = np.sort(self.im_center[1] - np.concatenate((col_left_side, -col_right_side), axis=0)).astype(int)
 
         [colony_col_pxl_2d, colony_row_pxl_2d] = np.meshgrid(colony_col_pxl, colony_row_pxl)
@@ -266,17 +270,17 @@ class Platometer:
 
     def test(self):
 
-        # Test the number of detected rows & columns
+        # Test the number of detected rows & columns (i.e., rows and cols with >50% of values)
         dt = self.colony_data.loc[pd.notnull(self.colony_data['size'])]
-        nrows = np.sum(dt.groupby('row')['size'].count() > 24)
-        ncols = np.sum(dt.groupby('col')['size'].count() > 16)
+        n_rows = np.sum(dt.groupby('row')['size'].count() > self.n_cols/2)
+        n_cols = np.sum(dt.groupby('col')['size'].count() > self.n_rows/2)
 
-        nrows_missing = 32-nrows
-        ncols_missing = 48-ncols
+        n_rows_missing = self.n_rows-n_rows
+        n_cols_missing = self.n_cols-n_cols
 
-        if (nrows_missing > 0) | (ncols_missing > 0):
+        if (n_rows_missing > 0) | (n_cols_missing > 0):
             if self.verbose:
-                print("Warning: %d rows and %d columns are missing." % (nrows_missing, ncols_missing))
+                print("Warning: %d rows and %d columns are missing." % (n_rows_missing, n_cols_missing))
 
         # # Check for giant colonies & mask them
         # md = np.nanmedian(self.colony_data['size'])
@@ -291,7 +295,7 @@ class Platometer:
         if 'show' in kwargs:
             im = getattr(self, kwargs['show'])
             if kwargs['show'] == 'im_objects':
-                colors = np.vstack(([0,0,0], np.random.rand(1536, 3)))
+                colors = np.vstack(([0, 0, 0], np.random.rand(self.n_rows*self.n_cols, 3)))
                 cmap = matplotlib.colors.ListedColormap(colors)
                 kwargs2 = {'cmap': cmap}
             elif kwargs['show'] == 'im_foreground':
@@ -425,7 +429,7 @@ def estimate_foreground_by_adaptive_thresholding(im_gray_trimmed, block_size=45)
 
 
 def run_platometer(image, save_to_file=False, verbose=True):
-    p = Platometer(image['path'], verbose=verbose)
+    p = Platometer(image['path'], plate_format=image['plate_format'], verbose=verbose)
 
     try:
         p.gray_and_trim()
@@ -449,7 +453,7 @@ def run_platometer_batch(image, save_to_file=False, verbose=False):
     colony_data = plate.get_colony_data()
 
     if isinstance(colony_data, pd.DataFrame):
-        cols = set(image.keys()) - set(['path'])
+        cols = [c for c in image.keys() if c not in ['path', 'plate_format']]
         for col in cols:
             colony_data[col] = image[col]
 
@@ -463,6 +467,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process plates')
     parser.add_argument('path_to_jpg_list', metavar='path_to_jpg_list', type=str,
                         help='Path to the file containing the list of jpgs to process')
+    parser.add_argument('--plate_format', metavar='plate_format', type=int, nargs=2, default=[32, 48],
+                        help='Expected plate format (default=32 48)')
     parser.add_argument('--chunk_size', metavar='chunk_size', type=int, default=100,
                         help='Number of images per chunk (default=100)')
     parser.add_argument('--nr_processes', metavar='nr_processes', type=int,
@@ -477,6 +483,10 @@ if __name__ == '__main__':
     nr_processes = mp.cpu_count()
     if args.nr_processes:
         nr_processes = args.nr_processes
+
+    plate_format = np.array([32, 48])
+    if args.plate_format:
+        plate_format = np.array(args.plate_format)
 
     folders = pd.read_csv(args.path_to_jpg_list, sep='\t', header=None)
 
@@ -507,7 +517,8 @@ if __name__ == '__main__':
             
             print('Chunk %d of %d, start %d, stop %d' % (n_chunk, len(chunk_starts), ix_chunk_start, ix_chunk_stop))
 
-            this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i]} for i in np.arange(ix_chunk_start, ix_chunk_stop+1)]
+            this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i], 'plate_format': plate_format}
+                                   for i in np.arange(ix_chunk_start, ix_chunk_stop+1)]
             chunk_data = pd.DataFrame()
 
             if nr_processes > 1:
