@@ -104,13 +104,6 @@ class Platometer:
         row_avg = np.nanmean(im_gray, axis=1)
         col_avg = np.nanmean(im_gray, axis=0)
 
-        # Find the positions of colony centers by fitting a sinusoid to the row and col averages
-        # self.fit_row = fit_sin(np.arange(len(row_avg)), row_avg, guess_freq=1/45)
-        # self.fit_col = fit_sin(np.arange(len(col_avg)), col_avg, guess_freq=1/45)
-
-        self.fit_row = fit_sin(np.arange(len(row_avg)), row_avg)
-        self.fit_col = fit_sin(np.arange(len(col_avg)), col_avg)
-
         row_pxl = np.arange(len(row_avg))
         col_pxl = np.arange(len(col_avg))
 
@@ -118,16 +111,25 @@ class Platometer:
         row_pxl_mid = np.percentile(row_pxl, [25, 75]).astype(int)
         col_pxl_mid = np.percentile(col_pxl, [25, 75]).astype(int)
 
-        row_pxl_mid_range = np.arange(row_pxl_mid[0],row_pxl_mid[1])
-        col_pxl_mid_range = np.arange(col_pxl_mid[0],col_pxl_mid[1])
+        row_pxl_mid_range = np.arange(row_pxl_mid[0], row_pxl_mid[1])
+        col_pxl_mid_range = np.arange(col_pxl_mid[0], col_pxl_mid[1])
+
+        # Find the positions of colony centers by fitting a sinusoid to the row and col averages
+        # First fit (only on the middle of the plate, to get robust estimates of parameters)
+        fit_row_0 = fit_sin(row_pxl_mid_range, row_avg[row_pxl_mid_range])
+        fit_col_0 = fit_sin(col_pxl_mid_range, col_avg[col_pxl_mid_range])
+
+        # Second fit (with the guesses from the first fit)
+        self.fit_row = fit_sin(row_pxl, row_avg, guess=fit_row_0['popt'])
+        self.fit_col = fit_sin(col_pxl, col_avg, guess=fit_col_0['popt'])
 
         row_avg_fit = self.fit_row['fitfunc'](row_pxl)
         col_avg_fit = self.fit_col['fitfunc'](col_pxl)
 
-        row_fit_error = np.sqrt(np.sum(np.square(row_avg[row_pxl_mid_range] - row_avg_fit[row_pxl_mid_range])))
-        col_fit_error = np.sqrt(np.sum(np.square(col_avg[col_pxl_mid_range] - col_avg_fit[col_pxl_mid_range])))
-
-        print('%s\n%.3f\t%.3f\n' % (self.path_to_image_file, row_fit_error, col_fit_error))
+        # row_fit_error = np.sqrt(np.sum(np.square(row_avg[row_pxl_mid_range] - row_avg_fit[row_pxl_mid_range])))
+        # col_fit_error = np.sqrt(np.sum(np.square(col_avg[col_pxl_mid_range] - col_avg_fit[col_pxl_mid_range])))
+        #
+        # print('%s\n%.3f\t%.3f\n' % (self.path_to_image_file, row_fit_error, col_fit_error))
 
         # Define the expected size of a window containing 32 rows or 48 columns
         w_row = np.ceil(self.fit_row['period'] * 32).astype(int)
@@ -269,17 +271,20 @@ class Platometer:
         nrows = np.sum(dt.groupby('row')['size'].count() > 24)
         ncols = np.sum(dt.groupby('col')['size'].count() > 16)
 
-        if (nrows < 32) | (ncols < 48):
-            if self.verbose:
-                print("Warning: One or more rows or columns is possibly missing.")
+        nrows_missing = 32-nrows
+        ncols_missing = 48-ncols
 
-        # Check for giant colonies & mask them
-        md = np.nanmedian(self.colony_data['size'])
-        is_giant_colony = self.colony_data['size'] > md*10
-        if np.sum(is_giant_colony) > 0:
+        if (nrows_missing > 0) | (ncols_missing > 0):
             if self.verbose:
-                print(format('Warning: Masking %d giant colonies.' % np.sum(is_giant_colony)))
-        self.colony_data.loc[is_giant_colony, 'size'] = np.nan
+                print("Warning: %d rows and %d columns are missing." % (nrows_missing, ncols_missing))
+
+        # # Check for giant colonies & mask them
+        # md = np.nanmedian(self.colony_data['size'])
+        # is_giant_colony = self.colony_data['size'] > md*10
+        # if np.sum(is_giant_colony) > 0:
+        #     if self.verbose:
+        #         print(format('Warning: Masking %d giant colonies.' % np.sum(is_giant_colony)))
+        # self.colony_data.loc[is_giant_colony, 'size'] = np.nan
 
     def show_plate(self, ax=None, **kwargs):
 
@@ -439,6 +444,7 @@ def run_platometer(image, save_to_file=False, verbose=True):
 def run_platometer_batch(image, save_to_file=False, verbose=False):
 
     plate = run_platometer(image, verbose=verbose)
+    plate.test()
 
     colony_data = plate.get_colony_data()
 

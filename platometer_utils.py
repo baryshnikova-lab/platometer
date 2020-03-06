@@ -164,41 +164,56 @@ def bucket(x, bucket_size):
     return np.lib.stride_tricks.as_strided(x, new_shape, new_strides).sum(axis)
 
 
-def fit_sin(x, y, guess_freq=None):
+def fit_sin(x, y, guess=np.array([])):
 
     """
     Fit a sin function to the input sequence
     :param x: x-values of the input sequence
     :param y: y-values of the input sequence
-    :param guess_freq: an initial guess of the sinusoid frequency (helps with robustness)
+    :param guess: an initial guess of the sinusoid parameters (helps with robustness)
     :return: dictionary containing the fitting parameters
     """
+
+    a0, w0, p0, c0, d0 = None, None, None, None, None
+    if guess.any():
+        a0, w0, p0, c0, d0 = guess
 
     x = np.array(x)
     y = np.array(y)
 
-    ff = np.fft.fftfreq(len(x), (x[1]-x[0]))   # assume uniform spacing
-    Fyy = abs(np.fft.fft(y))
+    if not a0:
+        a0 = np.std(y) * 2. ** 0.5
 
-    if not guess_freq:
-        guess_freq = abs(ff[np.argmax(Fyy[1:])+1]) # excluding the zero frequency "peak", which is related to offset
-        print(guess_freq)
+    if not c0:
+        c0 = np.mean(y)
 
-    guess_amp = np.std(y) * 2.**0.5
-    guess_offset = np.mean(y)
-    guess = np.array([guess_amp, 2.*np.pi*guess_freq, 0., guess_offset])
+    if not d0:
+        d0 = 0.01
 
-    def sinfunc(t, A, w, p, c): return A * np.sin(w*t + p) + c
+    if not p0:
+        p0 = 0.0
+
+    if not w0:
+        ff = np.fft.fftfreq(len(x), (x[1]-x[0]))   # assume uniform spacing
+        Fyy = abs(np.fft.fft(y))
+        w0 = abs(ff[np.argmax(Fyy[1:])+1]) # excluding the zero frequency "peak", which is related to offset
+        w0 = 2. * np.pi * w0
+
+    guess = np.array([a0, w0, p0, c0, d0])
+
+    def sinfunc(t, a, w, p, c, d): return a * np.sin(w*t + p) + c + d*t
 
     [popt, pcov] = scipy.optimize.curve_fit(sinfunc, x, y, p0=guess)
-    A, w, p, c = popt
+    a, w, p, c, d = popt
     f = w/(2.*np.pi)
-    fitfunc = lambda t: A * np.sin(w*t + p) + c
-    return {"amp": A,
-            "omega": w,
-            "phase": p,
-            "offset": c,
+    fitfunc = lambda t: a * np.sin(w*t + p) + c + d*t
+    return {"a": a,
+            "w": w,
+            "p": p,
+            "c": c,
+            "d": d,
             "freq": f,
+            "popt": popt,
             "period": 1./f,
             "fitfunc": fitfunc,
             "maxcov": np.max(pcov),
