@@ -3,8 +3,7 @@ import time
 import os
 import argparse
 import sys
-import traceback
-import dill as pickle
+import pickle
 
 # Necessary check to make sure code runs both in Jupyter and in command line
 if 'matplotlib' not in sys.modules:
@@ -18,7 +17,6 @@ import matplotlib.patches as patches
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-import scipy.optimize
 
 from scipy.signal import medfilt2d
 from scipy import ndimage as ndi
@@ -58,7 +56,7 @@ class Platometer:
 
         file_name = os.path.basename(self.path_to_image_file)
         parent_folder = os.path.dirname(os.path.dirname(self.path_to_image_file))
-        data_folder = os.path.join(parent_folder, '02_data')
+        data_folder = os.path.join(parent_folder, 'platometer_output')
 
         if not os.path.exists(data_folder):
             os.makedirs(data_folder)
@@ -73,6 +71,10 @@ class Platometer:
     def save(self):
 
         path_to_p_file = self.get_path_to_output_file('.p')
+
+        # (Hacky) Remove the fit_sin lambda to allow pickle to be used
+        del self.fit_row['fitfunc']
+        del self.fit_col['fitfunc']
 
         with open(path_to_p_file, 'wb') as file_handle:
             pickle.dump(self, file_handle)
@@ -307,6 +309,7 @@ class Platometer:
                 cmap = 'gray'
                 kwargs2 = {'cmap': cmap}
         else:
+            kwargs['show'] = 'plate'
             im = self.im_gray_trimmed
             kwargs2 = {'cmap': 'gray', 'vmin': 350, 'vmax': 600}
 
@@ -336,6 +339,10 @@ class Platometer:
             h = np.round(h * 3).astype(int)
 
             ax.imshow(im[y_pxl + h:y_pxl, x_pxl:x_pxl + w], **kwargs2)
+
+        elif kwargs['show'] == 'colony_data':
+
+            plot_plate(im, ax=ax, **kwargs)
 
         else:
 
@@ -386,7 +393,7 @@ def merge_colonies(pxl, vals=np.nan, distance_threshold=15):
     distances = np.diff(pxl)
     labels = np.insert(np.cumsum(distances > distance_threshold), 0, 0)
     df = pd.DataFrame(data={'label': labels, 'pxl': pxl, 'val': vals})
-    df_merged = df.groupby('label')['pxl', 'val'].mean()
+    df_merged = df.groupby('label')[['pxl', 'val']].mean()
 
     return df_merged['pxl'].values.astype(int), df_merged['val'].values
 
@@ -465,8 +472,8 @@ if __name__ == '__main__':
     start = time.time()
 
     parser = argparse.ArgumentParser(description='Process plates')
-    parser.add_argument('path_to_jpg_list', metavar='path_to_jpg_list', type=str,
-                        help='Path to the file containing the list of jpgs to process')
+    parser.add_argument('path_to_image_folder_list', metavar='path_to_image_folder_list', type=str,
+                        help='Path to the file containing the list of image folders to process')
     parser.add_argument('--plate_format', metavar='plate_format', type=int, nargs=2, default=[32, 48],
                         help='Expected plate format (default=32 48)')
     parser.add_argument('--chunk_size', metavar='chunk_size', type=int, default=100,
@@ -488,19 +495,22 @@ if __name__ == '__main__':
     if args.plate_format:
         plate_format = np.array(args.plate_format)
 
-    folders = pd.read_csv(args.path_to_jpg_list, sep='\t', header=None)
+    folders = pd.read_csv(args.path_to_image_folder_list, sep='\t', header=None)
 
     for folder in folders[0]:
 
         print('Processing %s' % folder)
 
         # Get path to the processed data folder
-        parent_folder = os.path.dirname(args.path_to_jpg_list)
-        sub_folder = '/'.join(folder.split('/')[4:])
-        data_folder = os.path.join(parent_folder, sub_folder)
-        
-        if not os.path.exists(data_folder):
-            os.makedirs(data_folder)
+        # parent_folder = os.path.dirname(args.path_to_image_folder_list)
+        # sub_folder = '/'.join(folder.split('/')[4:])
+        # data_folder = os.path.join(parent_folder, sub_folder)
+
+        data_folder = folder
+
+        # if not os.path.exists(data_folder):
+        #     os.makedirs(data_folder)
+        #     print('Created %s' % data_folder)
 
         # Get list of JPG files in the folder
         jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f)) and f.lower().endswith('jpg') and os.path.getsize(os.path.join(folder,f)) > 0]
@@ -543,16 +553,19 @@ if __name__ == '__main__':
         for n_chunk, ix_chunk in enumerate(chunk_starts):
 
             path_to_this_chunk_file = os.path.join(data_folder, format('chunk%d_data.p' % n_chunk))
-            chunk_data = load(path_to_this_chunk_file)
+            chunk_data = load(path_to_this_chunk_file, verbose=False)
             all_data = all_data.append(chunk_data, ignore_index=True)
 
-        # Save all data
-        path_to_all_data_file = os.path.join(data_folder, 'all_data.p')
-        save_to_p(all_data, path_to_all_data_file)
-        
-        # Save the file_id to path map
+            # Remove the temp "chunk" file
+            os.remove(path_to_this_chunk_file)
+
+        # Print all data
+        path_to_all_data_file = os.path.join(data_folder, 'all_data.txt')
+        all_data.to_csv(path_to_all_data_file, sep='\t', index=False)
+
+        # Print the file_id to path map
         jpg_map = pd.DataFrame(data={'path': jpg_files, 'file_id': jpg_files_id})
-        path_to_jpg_map_file = os.path.join(data_folder, 'jpg_map.p')
-        save_to_p(jpg_map, path_to_jpg_map_file)
+        path_to_jpg_map_file = os.path.join(data_folder, 'jpg_map.txt')
+        jpg_map.to_csv(path_to_jpg_map_file, sep='\t', index=False)
 
 
