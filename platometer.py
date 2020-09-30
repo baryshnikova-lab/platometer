@@ -51,7 +51,7 @@ class Platometer:
         self.colony_data = None
 
     def get_path_to_output_file(self, path='', extension=''):
-
+        """uses defined path or current path to save output"""
         if path:
             path_to_output_file = path.replace('~', expanduser('~'))
         else:
@@ -65,7 +65,7 @@ class Platometer:
         return path_to_output_file
 
     def save(self, path='', verbose=False):
-
+        """saves platometer output to file as pickle"""
         path_to_p_file = self.get_path_to_output_file(path=path, extension='.p')
 
         if verbose:
@@ -79,7 +79,7 @@ class Platometer:
             pickle.dump(self, file_handle)
 
     def print(self, path='', verbose=False):
-
+        """saves platometer outputfile as dat file"""
         path_to_dat_file = self.get_path_to_output_file(path=path, extension='.dat')
 
         if verbose:
@@ -96,7 +96,7 @@ class Platometer:
         f.close()
 
     def gray_and_trim(self):
-
+        """"convert image to gray scale and trims the edges of image to focus on plate and colonies"""
         # Convert to gray scale
         im_gray = np.nanmean(self.im, axis=2)
 
@@ -180,7 +180,7 @@ class Platometer:
         self.col_avg_fit = col_avg_fit[(col_pxl > trim_pxl_col[0]) & (col_pxl < trim_pxl_col[1])]
 
     def detect_colonies(self):
-
+        """detects the centers of each colony"""
         # --- Find the local maxima (= locations of colony centers)
         # Rows
         colony_row_pxl = detect_peaks(self.row_avg_fit, mpd=self.fit_row['period'] / 2, edge='both', kpsh=True, valley=False, show=False)
@@ -210,7 +210,7 @@ class Platometer:
         self.colony_pxl = list(zip(colony_row_pxl_2d.ravel(), colony_col_pxl_2d.ravel()))
 
     def measure_colony_sizes(self):
-
+        """colony size quantification"""
         # Estimate foreground
         # im_foreground = estimate_foreground_by_gmm(im_gray_trimmed,
         #                                                 colony_row_pxl_2d, colony_col_pxl_2d, n_components=3)
@@ -269,12 +269,11 @@ class Platometer:
         self.colony_data = colony_data
 
     def get_colony_data(self):
-
+        """returns colony size quantification data"""
         return self.colony_data
 
     def test(self):
-
-        # Test the number of detected rows & columns (i.e., rows and cols with >50% of values)
+        """Test the number of detected rows & columns (i.e., rows and cols with >50% of values)"""
         dt = self.colony_data.loc[pd.notnull(self.colony_data['size'])]
         n_rows = np.sum(dt.groupby('row')['size'].count() > self.n_cols/2)
         n_cols = np.sum(dt.groupby('col')['size'].count() > self.n_rows/2)
@@ -295,7 +294,7 @@ class Platometer:
         # self.colony_data.loc[is_giant_colony, 'size'] = np.nan
 
     def show_plate(self, ax=None, **kwargs):
-
+        """plots image of single plate at various stages of colony size quantification"""
         if 'show' in kwargs:
             im = getattr(self, kwargs['show'])
             if kwargs['show'] == 'im_objects':
@@ -354,7 +353,7 @@ class Platometer:
         ax.set_yticks([], [])
 
     def show_position(self, row, col, ax=None, **kwargs):
-    
+        """plot image of plate at defined row and column"""
         if 'c' in kwargs:
             c = kwargs['c']
         else:
@@ -392,6 +391,7 @@ class Platometer:
 
 
 def merge_colonies(pxl, vals=np.nan, distance_threshold=15):
+    """merge colonies at are very close"""
     distances = np.diff(pxl)
     labels = np.insert(np.cumsum(distances > distance_threshold), 0, 0)
     df = pd.DataFrame(data={'label': labels, 'pxl': pxl, 'val': vals})
@@ -401,8 +401,7 @@ def merge_colonies(pxl, vals=np.nan, distance_threshold=15):
 
 
 def estimate_foreground_by_gmm(im_gray_trimmed, colony_row_pxl_2d, colony_col_pxl_2d, n_components=3):
-
-    # Estimate background vs foreground using a 3-component Guassian Mixed Model
+    """Estimate background vs foreground using a 3-component Guassian Mixed Model"""
     igt = im_gray_trimmed.reshape(-1, 1)
     gmm = GaussianMixture(n_components=n_components, covariance_type='full').fit(igt)
     cluster_labels = gmm.predict(igt)
@@ -418,7 +417,7 @@ def estimate_foreground_by_gmm(im_gray_trimmed, colony_row_pxl_2d, colony_col_px
 
 
 def estimate_foreground_by_otsu(im_gray_trimmed):
-
+    """Estimate background vs foreground using otsu thresholding"""
     threshold = filters.threshold_otsu(im_gray_trimmed)
     im_foreground = im_gray_trimmed > threshold
 
@@ -426,7 +425,7 @@ def estimate_foreground_by_otsu(im_gray_trimmed):
 
 
 def estimate_foreground_by_adaptive_thresholding(im_gray_trimmed, block_size=45):
-
+    """Estimate background vs foreground using an adaptive threshold based on the local neighboorhood mean"""
     # Round block size to the nearest odd integer
     block_size = int(np.ceil(block_size) // 2 * 2 + 1)
 
@@ -438,7 +437,7 @@ def estimate_foreground_by_adaptive_thresholding(im_gray_trimmed, block_size=45)
 
 
 def run_platometer(image, save_to_file=False, verbose=True):
-
+    """run entire platometer script for colony size quantification and save as a pickle file"""
     image_path = image['path'].replace('~', expanduser('~'))
     p = Platometer(image_path, plate_format=image['plate_format'], verbose=verbose)
 
@@ -457,7 +456,7 @@ def run_platometer(image, save_to_file=False, verbose=True):
 
 
 def run_platometer_batch(image, save_to_file=False, verbose=False):
-
+    """run platometer on a batch of images, used for multiprocessing"""
     plate = run_platometer(image, verbose=verbose)
     plate.test()
 
