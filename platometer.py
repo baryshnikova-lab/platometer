@@ -26,7 +26,7 @@ from platometer_io import load, save_to_p, plot_plate
 
 
 class Platometer:
-
+    """ class for colony size quantification from images of arrayed growth experiments on plates"""
     def __init__(self, path_to_image_file, plate_format=np.array([32, 48]),
                  verbose=True):
 
