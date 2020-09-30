@@ -2,31 +2,28 @@ import datetime
 import time
 import os
 import argparse
-import sys
 import pickle
 
-# Necessary check to make sure code runs both in Jupyter and in command line
-if 'matplotlib' not in sys.modules:
-    import matplotlib
-    matplotlib.use('Agg')
-
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-
+from os.path import expanduser
+import multiprocessing as mp
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
 
-from os.path import expanduser
 from scipy.signal import medfilt2d
 from scipy import ndimage as ndi
 from sklearn.mixture import GaussianMixture
 from skimage import filters
 from skimage.morphology import watershed
 
-from platometer_io import *
-from platometer_utils import *
+# Necessary check to make sure code runs both in Jupyter and in command line
+#if 'matplotlib' not in sys.modules:
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
+from platometer_io import load, save_to_p, plot_plate
+from platometer_utils import detect_peaks, bucket, fit_sin
 
 
 class Platometer:
