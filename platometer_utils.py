@@ -1,3 +1,6 @@
+"""Code from https://github.com/demotu/BMC: to detect peaks in data based
+    on their amplitude and other features"""
+
 from __future__ import division, print_function
 
 import scipy
@@ -196,7 +199,8 @@ def fit_sin(x, y, guess=np.array([])):
     if not w0:
         ff = np.fft.fftfreq(len(x), (x[1]-x[0]))   # assume uniform spacing
         Fyy = abs(np.fft.fft(y))
-        w0 = abs(ff[np.argmax(Fyy[1:])+1]) # excluding the zero frequency "peak", which is related to offset
+        # excluding the zero frequency "peak", which is related to offset
+        w0 = abs(ff[np.argmax(Fyy[1:])+1])
         w0 = 2. * np.pi * w0
 
     guess = np.array([a0, w0, p0, c0, d0])
