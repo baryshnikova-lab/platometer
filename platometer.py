@@ -538,8 +538,10 @@ if __name__ == '__main__':
     nr_processes = mp.cpu_count()
     if args.nr_processes:
         nr_processes = args.nr_processes
-    
-    plate_format = np.array(args.plate_format)
+
+    plate_format = np.array([32, 48])
+    if args.plate_format:
+        plate_format = np.array(args.plate_format)
 
     folders = pd.read_csv(args.path_to_image_folder_list,
                           sep='\t', header=None)
