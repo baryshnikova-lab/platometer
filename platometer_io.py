@@ -1,4 +1,5 @@
-""" code to open, save and plot data from platometer.py"""
+"""Additional Platometer helper functions to open, save and plot data.
+"""
 import os
 import pickle
 import pandas as pd
@@ -8,8 +9,15 @@ import matplotlib.colors as colors
 
 from matplotlib.colors import LinearSegmentedColormap
 
+
 def save_to_p(data, output_file=None):
-    """save data as pickle file"""
+    """Saves object to a pickle file.
+
+    Args:
+        data (obj): Object to be saved.
+        output_file (str, optional): Destination path for saving.
+    """
+
     if not output_file:
         output_file = os.path.join(os.getcwd(), 'output.p')
 
@@ -18,13 +26,16 @@ def save_to_p(data, output_file=None):
 
 
 def load(file_path, version=3, verbose=True):
-
     """
-    # Loads all objects from a pickle or a HDF5 file
-    :param file_path: local path to the input file
-    :param v: python version
-    :param verbose:
-    :return: contents of the input file
+    Loads all objects from a pickle or a HDF5 file.
+
+    Args:
+        file_path (str): Path to the input file.
+        version (int, optional): Python version (2 or 3) in which the input file was saved.
+        verbose (bool, optional): If True, show details.
+
+    Returns:
+        obj: The contents of the input file.
     """
 
     # home = expanduser('~')
@@ -65,7 +76,17 @@ def load(file_path, version=3, verbose=True):
 
 
 def plot_plate(data, colorbar=False, **kwargs):
-    """plot colony quantification of plates with colonies color coded by size"""
+    """Plots plate as a heatmap of colony sizes.
+
+    Args:
+        data (pandas.DataFrame): A DataFrame containing the quantified colony size data.
+        colorbar (bool, optional): If True, plots the colorbar.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        matplotlib.axes.Axes containing the plate plot.
+    """
+
     plate = np.zeros((32, 48)) + np.nan
 
     rows = data['row'].values.astype(int)
@@ -112,11 +133,16 @@ def plot_plate(data, colorbar=False, **kwargs):
 
     plt.tight_layout()
 
-    return img, axes
+    return axes
 
 
 def red_green():
-    """create colormap with range red (low) to green (high)"""
+    """Creates a divergent colormap centered on black and ranging from red (low) to green (high).
+
+    Returns:
+        LinearSegmentedColormap in the red-black-green range.
+    """
+
     color_dict = {'red': ((0.0, 0.0, 1.0), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
                   'green': ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (1.0, 1.0, 1.0)),
                   'blue': ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
@@ -129,7 +155,9 @@ def red_green():
 
 
 class MidpointRangeNormalize(colors.Normalize):
-    """normalize colors by data midpoints"""
+    """Normalizes colors to match a specified mid-range.
+    """
+
     def __init__(self, vmin=None, vmax=None, midrange=None, clip=False):
         self.midrange = midrange
         colors.Normalize.__init__(self, vmin, vmax, clip)
