@@ -73,13 +73,13 @@ def plot_plate(data, colorbar=False, **kwargs):
 
     plate[rows - 1, cols - 1] = vals
 
-    if 'ax' in kwargs:
-        ax = kwargs['ax']
+    if 'axes' in kwargs:
+        axes = kwargs['axes']
     else:
-        fig, ax = plt.subplots(1, 1, figsize=(20, 10))
+        fig, axes = plt.subplots(1, 1, figsize=(20, 10))
 
-    vmin = kwargs.get('vmin',np.nanpercentile(vals, 5))
-    vmax = kwargs.get('vmax',np.nanpercentile(vals, 95))
+    vmin = kwargs.get('vmin', np.nanpercentile(vals, 5))
+    vmax = kwargs.get('vmax', np.nanpercentile(vals, 95))
     midrange = kwargs.get('midrange',np.percentile(vals[(vals >= vmin) & (vals <= vmax)], [40, 60]))
 
     if 'ticklabels' in kwargs:
@@ -89,29 +89,29 @@ def plot_plate(data, colorbar=False, **kwargs):
         xticklabels = False
         yticklabels = False
 
-    img = ax.imshow(plate, cmap=red_green(),
+    img = axes.imshow(plate, cmap=red_green(),
                    norm=MidpointRangeNormalize(midrange=midrange),
                    interpolation='nearest',
                    vmin=vmin, vmax=vmax)
 
-    ax.set_aspect('equal')
-    #     ax.set_xlim(-1, 48)
-    #     ax.set_ylim(-1, 32)
-    #     ax.invert_yaxis()
-    ax.grid(False)
+    axes.set_aspect('equal')
+    #     axes.set_xlim(-1, 48)
+    #     axes.set_ylim(-1, 32)
+    #     axes.invert_yaxis()
+    axes.grid(False)
 
     if ~xticklabels:
-        ax.set_xticks([])
+        axes.set_xticks([])
 
     if ~yticklabels:
-        ax.set_yticks([])
+        axes.set_yticks([])
 
     if colorbar:
-        plt.colorbar(img, ax=ax)
+        plt.colorbar(img, ax=axes)
 
     plt.tight_layout()
 
-    return img, ax
+    return img, axes
 
 
 def red_green():

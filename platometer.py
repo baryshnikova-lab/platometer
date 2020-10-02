@@ -17,8 +17,6 @@ from skimage import filters
 from skimage.morphology import watershed
 
 import matplotlib
-#pylint wants this moved to the end  then the code no longer works
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -29,8 +27,7 @@ from platometer_utils import detect_peaks, bucket, fit_sin
 class Platometer:
     """ class to analyze images of plates for colony size quantification"""
 
-    def __init__(self, path_to_image_file, plate_format=np.array([32, 48]),
-                 verbose=True):
+    def __init__(self, path_to_image_file, plate_format=np.array([32, 48]), verbose=True):
 
         self.path_to_image_file = path_to_image_file
         self.verbose = verbose
@@ -325,7 +322,7 @@ class Platometer:
         #         print(format('Warning: Masking %d giant colonies.' % np.sum(is_giant_colony)))
         # self.colony_data.loc[is_giant_colony, 'size'] = np.nan
 
-    def show_plate(self, ax=None, **kwargs):
+    def show_plate(self, axes=None, **kwargs):
         """plots image of single plate at various stages of colony size quantification"""
         if 'show' in kwargs:
             img = getattr(self, kwargs['show'])
@@ -347,8 +344,8 @@ class Platometer:
             img = self.im_gray_trimmed
             kwargs2 = {'cmap': 'gray', 'vmin': 350, 'vmax': 600}
 
-        if not ax:
-            ax = plt.axes()
+        if not axes:
+            axes = plt.axes()
 
         if 'row' in kwargs:
             row = kwargs['row']
@@ -376,21 +373,23 @@ class Platometer:
             width = np.round(width * 3).astype(int)
             height = np.round(height * 3).astype(int)
 
-            ax.imshow(img[y_pxl + height:y_pxl,
+            axes.imshow(img[y_pxl + height:y_pxl,
                           x_pxl:x_pxl + width], **kwargs2)
 
         elif kwargs['show'] == 'colony_data':
 
-            plot_plate(img, ax=ax, **kwargs)
+            plot_plate(img, axes=axes, **kwargs)
 
         else:
 
-            ax.imshow(img, **kwargs2)
+            axes.imshow(img, **kwargs2)
 
-        ax.set_xticks([], [])
-        ax.set_yticks([], [])
+        axes.set_xticks([], [])
+        axes.set_yticks([], [])
 
-    def show_position(self, row, col, ax=None, **kwargs):
+        return axes
+
+    def show_position(self, row, col, axes=None, **kwargs):
         """plot image of plate at defined row and column"""
         e_color = kwargs.get('c', 'r')
 
@@ -419,12 +418,12 @@ class Platometer:
         rect = patches.Rectangle((x_pxl, y_pxl), width, height,
                                  linewidth=2, edgecolor=e_color, facecolor='none')
 
-        if not ax:
-            ax = plt.axes()
+        if not axes:
+            axes = plt.axes()
 
-#         ax.imshow(self.im_gray_trimmed)
+#         axes.imshow(self.im_gray_trimmed)
 
-        ax.add_patch(rect)
+        axes.add_patch(rect)
 
 
 def merge_colonies(pxl, vals=np.nan, distance_threshold=15):
