@@ -5,6 +5,7 @@ from __future__ import division, print_function
 
 import scipy
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 __author__ = "Marcos Duarte, https://github.com/demotu/BMC"
@@ -12,14 +13,13 @@ __version__ = "1.0.4"
 __license__ = "MIT"
 
 
-def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
-                 kpsh=False, valley=False, show=False, ax=None):
+def detect_peaks(data, mph=None, mpd=1, threshold=0, edge='rising',
+                 kpsh=False, valley=False, show=False, axes=None):
     """Detect peaks in data based on their amplitude and other features.
 
     Parameters
     ----------
-    x : 1D array_like
-        data.
+    data : 1D array_like
     mph : {None, number}, optional (default = None)
         detect peaks that are greater than minimum peak height.
     mpd : positive integer, optional (default = 1)
@@ -38,12 +38,12 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
         if True (1), detect valleys (local minima) instead of peaks.
     show : bool, optional (default = False)
         if True (1), plot data in matplotlib figure.
-    ax : a matplotlib.axes.Axes instance, optional (default = None).
+    axes : a matplotlib.axes.Axes instance, optional (default = None).
 
     Returns
     -------
     ind : 1D array_like
-        indeces of the peaks in `x`.
+        indeces of the peaks in `data`.
 
     Notes
     -----
@@ -60,165 +60,181 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
 
     """
 
-    x = np.atleast_1d(x).astype('float64')
-    if x.size < 3:
+    data = np.atleast_1d(data).astype('float64')
+
+    if data.size < 3:
         return np.array([], dtype=int)
+
     if valley:
-        x = -x
-    # find indices of all peaks
-    dx = x[1:] - x[:-1]
-    # handle NaN's
-    indnan = np.where(np.isnan(x))[0]
+        data = -data
+
+    # Find indices of all peaks
+    data_dx = data[1:] - data[:-1]
+
+    # Handle NaN's
+    indnan = np.where(np.isnan(data))[0]
+
     if indnan.size:
-        x[indnan] = np.inf
-        dx[np.where(np.isnan(dx))[0]] = np.inf
+        data[indnan] = np.inf
+        data_dx[np.where(np.isnan(data_dx))[0]] = np.inf
     ine, ire, ife = np.array([[], [], []], dtype=int)
+
     if not edge:
-        ine = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) > 0))[0]
+        ine = np.where((np.hstack((data_dx, 0)) < 0) & (np.hstack((0, data_dx)) > 0))[0]
     else:
         if edge.lower() in ['rising', 'both']:
-            ire = np.where((np.hstack((dx, 0)) <= 0) & (np.hstack((0, dx)) > 0))[0]
+            ire = np.where((np.hstack((data_dx, 0)) <= 0) & (np.hstack((0, data_dx)) > 0))[0]
         if edge.lower() in ['falling', 'both']:
-            ife = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) >= 0))[0]
+            ife = np.where((np.hstack((data_dx, 0)) < 0) & (np.hstack((0, data_dx)) >= 0))[0]
+
     ind = np.unique(np.hstack((ine, ire, ife)))
-    # handle NaN's
+
+    # Handle NaN's
     if ind.size and indnan.size:
         # NaN's and values close to NaN's cannot be peaks
         ind = ind[np.in1d(ind, np.unique(np.hstack((indnan, indnan - 1, indnan + 1))), invert=True)]
     # first and last values of x cannot be peaks
     if ind.size and ind[0] == 0:
         ind = ind[1:]
-    if ind.size and ind[-1] == x.size - 1:
+    if ind.size and ind[-1] == data.size - 1:
         ind = ind[:-1]
     # remove peaks < minimum peak height
     if ind.size and mph is not None:
-        ind = ind[x[ind] >= mph]
+        ind = ind[data[ind] >= mph]
     # remove peaks - neighbors < threshold
     if ind.size and threshold > 0:
-        dx = np.min(np.vstack([x[ind] - x[ind - 1], x[ind] - x[ind + 1]]), axis=0)
-        ind = np.delete(ind, np.where(dx < threshold)[0])
+        data_dx = np.min(np.vstack([data[ind] - data[ind - 1], data[ind] - data[ind + 1]]), axis=0)
+        ind = np.delete(ind, np.where(data_dx < threshold)[0])
     # detect small peaks closer than minimum peak distance
     if ind.size and mpd > 1:
-        ind = ind[np.argsort(x[ind])][::-1]  # sort ind by peak height
+        ind = ind[np.argsort(data[ind])][::-1]  # sort ind by peak height
         idel = np.zeros(ind.size, dtype=bool)
         for i in range(ind.size):
             if not idel[i]:
                 # keep peaks with the same height if kpsh is True
                 idel = idel | (ind >= ind[i] - mpd) & (ind <= ind[i] + mpd) \
-                       & (x[ind[i]] > x[ind] if kpsh else True)
+                       & (data[ind[i]] > data[ind] if kpsh else True)
                 idel[i] = 0  # Keep current peak
         # remove the small peaks and sort back the indices by their occurrence
         ind = np.sort(ind[~idel])
 
     if show:
         if indnan.size:
-            x[indnan] = np.nan
+            data[indnan] = np.nan
         if valley:
-            x = -x
-        _plot(x, mph, mpd, threshold, edge, valley, ax, ind)
+            data = -data
+        _plot(data, mph, mpd, threshold, edge, valley, axes, ind)
 
     return ind
 
 
-def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
+def _plot(data, mph, mpd, threshold, edge, valley, axes, ind):
     """Plot results of the detect_peaks function, see its help."""
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        print('matplotlib is not available.')
-    else:
-        if ax is None:
-            _, ax = plt.subplots(1, 1, figsize=(8, 4))
 
-        ax.plot(x, 'b', lw=1)
-        if ind.size:
-            label = 'valley' if valley else 'peak'
-            label = label + 's' if ind.size > 1 else label
-            ax.plot(ind, x[ind], '+', mfc=None, mec='r', mew=2, ms=8,
-                    label='%d %s' % (ind.size, label))
-            ax.legend(loc='best', framealpha=.5, numpoints=1)
-        ax.set_xlim(-.02 * x.size, x.size * 1.02 - 1)
-        ymin, ymax = x[np.isfinite(x)].min(), x[np.isfinite(x)].max()
-        yrange = ymax - ymin if ymax > ymin else 1
-        ax.set_ylim(ymin - 0.1 * yrange, ymax + 0.1 * yrange)
-        ax.set_xlabel('Data #', fontsize=14)
-        ax.set_ylabel('Amplitude', fontsize=14)
-        mode = 'Valley detection' if valley else 'Peak detection'
-        ax.set_title("%s (mph=%s, mpd=%d, threshold=%s, edge='%s')"
-                     % (mode, str(mph), mpd, str(threshold), edge))
-        # plt.grid()
-        plt.show()
+    if axes is None:
+        _, axes = plt.subplots(1, 1, figsize=(8, 4))
+
+    axes.plot(data, 'b', lw=1)
+
+    if ind.size:
+        label = 'valley' if valley else 'peak'
+        label = label + 's' if ind.size > 1 else label
+        axes.plot(ind, data[ind], '+', mfc=None, mec='r',
+                  mew=2, ms=8, label='%d %s' % (ind.size, label))
+        axes.legend(loc='best', framealpha=.5, numpoints=1)
+
+    axes.set_xlim(-.02 * data.size, data.size * 1.02 - 1)
+    ymin, ymax = data[np.isfinite(data)].min(), data[np.isfinite(data)].max()
+    yrange = ymax - ymin if ymax > ymin else 1
+    axes.set_ylim(ymin - 0.1 * yrange, ymax + 0.1 * yrange)
+    axes.set_xlabel('Data #', fontsize=14)
+    axes.set_ylabel('Amplitude', fontsize=14)
+    mode = 'Valley detection' if valley else 'Peak detection'
+    axes.set_title("%s (mph=%s, mpd=%d, threshold=%s, edge='%s')"
+                 % (mode, str(mph), mpd, str(threshold), edge))
+    # plt.grid()
+    plt.show()
 
 
-def bucket(x, bucket_size):
+def bucket(data, bucket_size):
     """'Pixel bucket' a numpy array.
     By 'pixel bucket', I mean, replace groups of N consecutive pixels in
     the array with a single pixel which is the sum of the N replaced
     pixels. See: http://stackoverflow.com/q/36269508/513688
     Author: Andrew York
     """
-    for b in bucket_size: assert float(b).is_integer()
-    bucket_size = [int(b) for b in bucket_size]
-    x = np.ascontiguousarray(x)
-    new_shape = np.concatenate((np.array(x.shape) // bucket_size, bucket_size))
-    old_strides = np.array(x.strides)
+
+    for bucket_dim in bucket_size:
+        assert float(bucket_dim).is_integer()
+
+    bucket_size = [int(bucket_dim) for bucket_dim in bucket_size]
+    data = np.ascontiguousarray(data)
+    new_shape = np.concatenate((np.array(data.shape) // bucket_size, bucket_size))
+    old_strides = np.array(data.strides)
     new_strides = np.concatenate((old_strides * bucket_size, old_strides))
-    axis = tuple(range(x.ndim, 2 * x.ndim))
-    return np.lib.stride_tricks.as_strided(x, new_shape, new_strides).sum(axis)
+    axis = tuple(range(data.ndim, 2 * data.ndim))
+    return np.lib.stride_tricks.as_strided(data, new_shape, new_strides).sum(axis)
 
 
-def fit_sin(x, y, guess=np.array([])):
+def fit_sin(x_vals, y_vals, guess=np.array([])):
 
     """
     Fit a sin function to the input sequence
-    :param x: x-values of the input sequence
-    :param y: y-values of the input sequence
+    :param x_vals: x-values of the input sequence
+    :param y_vals: y-values of the input sequence
     :param guess: an initial guess of the sinusoid parameters (helps with robustness)
     :return: dictionary containing the fitting parameters
     """
 
-    a0, w0, p0, c0, d0 = None, None, None, None, None
+    amplitude_guess, angular_frequency_guess = None, None
+    phase_guess, offset_guess, slope_guess = None, None, None
+
     if guess.any():
-        a0, w0, p0, c0, d0 = guess
+        amplitude_guess, angular_frequency_guess, phase_guess, offset_guess, slope_guess = guess
 
-    x = np.array(x)
-    y = np.array(y)
+    x_vals = np.array(x_vals)
+    y_vals = np.array(y_vals)
 
-    if not a0:
-        a0 = np.std(y) * 2. ** 0.5
+    if not amplitude_guess:
+        amplitude_guess = np.std(y_vals) * 2. ** 0.5
 
-    if not c0:
-        c0 = np.mean(y)
+    if not offset_guess:
+        offset_guess = np.mean(y_vals)
 
-    if not d0:
-        d0 = 0.01
+    if not slope_guess:
+        slope_guess = 0.01
 
-    if not p0:
-        p0 = 0.0
+    if not phase_guess:
+        phase_guess = 0.0
 
-    if not w0:
-        ff = np.fft.fftfreq(len(x), (x[1]-x[0]))   # assume uniform spacing
-        Fyy = abs(np.fft.fft(y))
-        # excluding the zero frequency "peak", which is related to offset
-        w0 = abs(ff[np.argmax(Fyy[1:])+1])
-        w0 = 2. * np.pi * w0
+    if not angular_frequency_guess:
+        # Assume uniform spacing
+        fourier_frequencies = np.fft.fftfreq(len(x_vals), (x_vals[1]-x_vals[0]))
+        fourier_transforms = abs(np.fft.fft(y_vals))
 
-    guess = np.array([a0, w0, p0, c0, d0])
+        # Excluding the zero frequency "peak", which is related to offset
+        frequency_guess = abs(fourier_frequencies[np.argmax(fourier_transforms[1:])+1])
+        angular_frequency_guess = 2. * np.pi * frequency_guess
 
-    def sinfunc(t, a, w, p, c, d): return a * np.sin(w*t + p) + c + d*t
+    guess = np.array([amplitude_guess, angular_frequency_guess,
+                      phase_guess, offset_guess, slope_guess])
 
-    [popt, pcov] = scipy.optimize.curve_fit(sinfunc, x, y, p0=guess)
-    a, w, p, c, d = popt
-    f = w/(2.*np.pi)
-    fitfunc = lambda t: a * np.sin(w*t + p) + c + d*t
-    return {"a": a,
-            "w": w,
-            "p": p,
-            "c": c,
-            "d": d,
-            "freq": f,
+    def sinfunc(time, amplitude, angular_frequency, phase, offset, slope):
+        return amplitude * np.sin(angular_frequency*time + phase) + offset + slope*time
+
+    [popt, pcov] = scipy.optimize.curve_fit(sinfunc, x_vals, y_vals, p0=guess)
+    amplitude, angular_frequency, phase, offset, slope = popt
+    frequency = angular_frequency/(2.*np.pi)
+    fitfunc = lambda t: amplitude * np.sin(angular_frequency*t + phase) + offset + slope*t
+
+    return {"a": amplitude,
+            "w": angular_frequency,
+            "p": phase,
+            "c": offset,
+            "d": slope,
+            "freq": frequency,
             "popt": popt,
-            "period": 1./f,
+            "period": 1./frequency,
             "fitfunc": fitfunc,
             "maxcov": np.max(pcov),
             "rawres": (guess, popt, pcov)}

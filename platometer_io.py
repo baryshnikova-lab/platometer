@@ -40,12 +40,10 @@ def load(file_path, version=3, verbose=True):
             fkeys = store.keys()
 
         for k in fkeys:
-            k = k.lstrip('\/')
+            k = k.lstrip(r'\/')
             if verbose:
                 print(k)
             output[k] = pd.read_hdf(file_path, k)
-
-        return output
 
     elif file_extension == '.p':
 
@@ -57,10 +55,13 @@ def load(file_path, version=3, verbose=True):
 
         if verbose:
             print(', '.join(output.keys()))
-        return output
 
     else:
+
+        output = {}
         print("Extension unknown. Only pickle (.p) and HDF5 (.h5) files are supported.")
+
+    return output
 
 
 def plot_plate(data, colorbar=False, **kwargs):
@@ -76,7 +77,7 @@ def plot_plate(data, colorbar=False, **kwargs):
     if 'axes' in kwargs:
         axes = kwargs['axes']
     else:
-        fig, axes = plt.subplots(1, 1, figsize=(20, 10))
+        _, axes = plt.subplots(1, 1, figsize=(20, 10))
 
     vmin = kwargs.get('vmin', np.nanpercentile(vals, 5))
     vmax = kwargs.get('vmax', np.nanpercentile(vals, 95))
