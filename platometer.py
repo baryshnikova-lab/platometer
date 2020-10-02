@@ -267,8 +267,11 @@ class Platometer:
         im_foreground_objects = im_objects > 0
         distance = ndi.distance_transform_edt(im_foreground_objects)
 
+        # (Hacky) Getting the negative distance (pylint raises an E1130 for -distance)
+        distance = np.multiply(distance, -1)
+
         # 3. Label
-        im_objects = watershed(-distance, markers, mask=im_foreground_objects)
+        im_objects = watershed(distance, markers, mask=im_foreground_objects)
 
         self.im_objects = im_objects
 
@@ -538,10 +541,6 @@ if __name__ == '__main__':
     if args.nr_processes:
         nr_processes = args.nr_processes
 
-    plate_format = np.array([32, 48])
-    if args.plate_format:
-        plate_format = np.array(args.plate_format)
-
     folders = pd.read_csv(args.path_to_image_folder_list,
                           sep='\t', header=None)
 
@@ -580,7 +579,7 @@ if __name__ == '__main__':
                                                          ix_chunk_start, ix_chunk_stop))
 
             this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i],
-                                    'plate_format': plate_format} for i in
+                                    'plate_format': np.array(args.plate_format)} for i in
                                    np.arange(ix_chunk_start, ix_chunk_stop+1)]
 
             chunk_data = pd.DataFrame()
