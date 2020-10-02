@@ -1,3 +1,5 @@
+"""Additional Platometer helper functions to open, save and plot data.
+"""
 import os
 import pickle
 import pandas as pd
@@ -9,6 +11,12 @@ from matplotlib.colors import LinearSegmentedColormap
 
 
 def save_to_p(data, output_file=None):
+    """Saves object to a pickle file.
+
+    Args:
+        data (obj): Object to be saved.
+        output_file (str, optional): Destination path for saving.
+    """
 
     if not output_file:
         output_file = os.path.join(os.getcwd(), 'output.p')
@@ -17,14 +25,17 @@ def save_to_p(data, output_file=None):
         pickle.dump(data, handle)
 
 
-def load(file_path, v=3, verbose=True):
-
+def load(file_path, version=3, verbose=True):
     """
-    # Loads all objects from a pickle or a HDF5 file
-    :param file_path: local path to the input file
-    :param v: python version
-    :param verbose:
-    :return: contents of the input file
+    Loads all objects from a pickle or a HDF5 file.
+
+    Args:
+        file_path (str): Path to the input file.
+        version (int, optional): Python version (2 or 3) in which the input file was saved.
+        verbose (bool, optional): If True, show details.
+
+    Returns:
+        obj: The contents of the input file.
     """
 
     # home = expanduser('~')
@@ -37,33 +48,45 @@ def load(file_path, v=3, verbose=True):
         output = {}
 
         with pd.HDFStore(file_path) as store:
-            ks = store.keys()
+            fkeys = store.keys()
 
-        for k in ks:
-            k = k.lstrip('\/')
+        for k in fkeys:
+            k = k.lstrip(r'\/')
             if verbose:
                 print(k)
             output[k] = pd.read_hdf(file_path, k)
 
-        return output
-
     elif file_extension == '.p':
 
-        if v == 3:
+        if version == 3:
             output = pd.read_pickle(file_path)
         else:
-            f = open(file_path, 'r')
-            output = pickle.load(f)
+            pickle_file = open(file_path, 'r')
+            output = pickle.load(pickle_file)
 
         if verbose:
-            print(', '.join([k for k in output.keys()]))
-        return output
+            print(', '.join(output.keys()))
 
     else:
+
+        output = {}
         print("Extension unknown. Only pickle (.p) and HDF5 (.h5) files are supported.")
+
+    return output
 
 
 def plot_plate(data, colorbar=False, **kwargs):
+    """Plots plate as a heatmap of colony sizes.
+
+    Args:
+        data (pandas.DataFrame): A DataFrame containing the quantified colony size data.
+        colorbar (bool, optional): If True, plots the colorbar.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        matplotlib.axes.Axes containing the plate plot.
+    """
+
     plate = np.zeros((32, 48)) + np.nan
 
     rows = data['row'].values.astype(int)
@@ -72,25 +95,14 @@ def plot_plate(data, colorbar=False, **kwargs):
 
     plate[rows - 1, cols - 1] = vals
 
-    if 'ax' in kwargs:
-        ax = kwargs['ax']
+    if 'axes' in kwargs:
+        axes = kwargs['axes']
     else:
-        fig, ax = plt.subplots(1, 1, figsize=(20, 10))
+        _, axes = plt.subplots(1, 1, figsize=(20, 10))
 
-    if 'vmin' in kwargs:
-        vmin = kwargs['vmin']
-    else:
-        vmin = np.nanpercentile(vals, 5)
-
-    if 'vmax' in kwargs:
-        vmax = kwargs['vmax']
-    else:
-        vmax = np.nanpercentile(vals, 95)
-
-    if 'midrange' in kwargs:
-        midrange = kwargs['midrange']
-    else:
-        midrange = np.percentile(vals[(vals >= vmin) & (vals <= vmax)], [40, 60])
+    vmin = kwargs.get('vmin', np.nanpercentile(vals, 5))
+    vmax = kwargs.get('vmax', np.nanpercentile(vals, 95))
+    midrange = kwargs.get('midrange',np.percentile(vals[(vals >= vmin) & (vals <= vmax)], [40, 60]))
 
     if 'ticklabels' in kwargs:
         xticklabels = kwargs['ticklabels']
@@ -99,32 +111,37 @@ def plot_plate(data, colorbar=False, **kwargs):
         xticklabels = False
         yticklabels = False
 
-    im = ax.imshow(plate, cmap=red_green(),
+    img = axes.imshow(plate, cmap=red_green(),
                    norm=MidpointRangeNormalize(midrange=midrange),
                    interpolation='nearest',
                    vmin=vmin, vmax=vmax)
 
-    ax.set_aspect('equal')
-    #     ax.set_xlim(-1, 48)
-    #     ax.set_ylim(-1, 32)
-    #     ax.invert_yaxis()
-    ax.grid(False)
+    axes.set_aspect('equal')
+    #     axes.set_xlim(-1, 48)
+    #     axes.set_ylim(-1, 32)
+    #     axes.invert_yaxis()
+    axes.grid(False)
 
     if ~xticklabels:
-        ax.set_xticks([])
+        axes.set_xticks([])
 
     if ~yticklabels:
-        ax.set_yticks([])
+        axes.set_yticks([])
 
     if colorbar:
-        plt.colorbar(im, ax=ax)
+        plt.colorbar(img, ax=axes)
 
     plt.tight_layout()
 
-    return im, ax
+    return axes
 
 
 def red_green():
+    """Creates a divergent colormap centered on black and ranging from red (low) to green (high).
+
+    Returns:
+        LinearSegmentedColormap in the red-black-green range.
+    """
 
     color_dict = {'red': ((0.0, 0.0, 1.0), (0.5, 0.0, 0.0), (1.0, 0.0, 0.0)),
                   'green': ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0), (1.0, 1.0, 1.0)),
@@ -138,13 +155,14 @@ def red_green():
 
 
 class MidpointRangeNormalize(colors.Normalize):
+    """Normalizes colors to match a specified mid-range.
+    """
 
     def __init__(self, vmin=None, vmax=None, midrange=None, clip=False):
         self.midrange = midrange
         colors.Normalize.__init__(self, vmin, vmax, clip)
 
     def __call__(self, value, clip=None):
-        x = [self.vmin, self.midrange[0], self.midrange[1], self.vmax]
-        y = [0, 0.5, 0.5, 1]
-        return np.ma.masked_array(np.interp(value, x, y))
-
+        x_values = [self.vmin, self.midrange[0], self.midrange[1], self.vmax]
+        y_values = [0, 0.5, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x_values, y_values))
