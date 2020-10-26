@@ -81,7 +81,7 @@ class Platometer:
         already_exists = os.path.isfile(path_to_output_file)
         if already_exists:
             raise FileExistsError(('File %s already exists. '
-                                   'Please specify a different path'
+                                   'Please specify a different path '
                                    'or a different extension.' % path_to_output_file))
 
         return path_to_output_file
