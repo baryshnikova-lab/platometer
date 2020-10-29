@@ -635,6 +635,35 @@ def run_platometer_batch(image, verbose=False):
 
     return colony_data
 
+def process_and_save_chunk(n_chunk, ix_chunk_start, ix_chunk_stop, jpg_files,
+        jpg_files_id, plate_format, nr_processes, data_folder, start):
+    """runs platometer on current chunk and saves output to a temp file"""
+    
+    this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i],
+                            'plate_format': np.array(plate_format)} for i in
+                           np.arange(ix_chunk_start, ix_chunk_stop+1)]
+
+    chunk_data = pd.DataFrame()
+
+    if nr_processes > 1:
+        pool = mp.Pool(processes=nr_processes)
+        for res in pool.map_async(run_platometer_batch, this_jpg_files_dict).get():
+            if res.shape[0] > 0:
+                chunk_data = chunk_data.append(res, ignore_index=True)
+    else:
+        for im in this_jpg_files_dict:
+            chunk_data = chunk_data.append(
+                run_platometer_batch(im), ignore_index=True)
+
+    # Temporarily save the chunk data
+    path_to_this_chunk_file = os.path.join(
+        data_folder, format('chunk%d_data.p' % n_chunk))
+    save_to_p(chunk_data, path_to_this_chunk_file)
+
+    print('Execution time: %.2f seconds' % (time.time()-start))
+    start = time.time()
+
+
 
 if __name__ == '__main__':
 
@@ -690,36 +719,15 @@ if __name__ == '__main__':
         chunk_starts = np.arange(0, nr_jpg_files, CHUNK_SIZE)
 
         for n_chunk, ix_chunk in enumerate(chunk_starts):
-
+            
             ix_chunk_start = ix_chunk
             ix_chunk_stop = np.min([ix_chunk+CHUNK_SIZE-1, nr_jpg_files-1])
-
+            
             print('Chunk %d of %d, start %d, stop %d' % (n_chunk, len(chunk_starts),
-                                                         ix_chunk_start, ix_chunk_stop))
+                                                 ix_chunk_start, ix_chunk_stop))
 
-            this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i],
-                                    'plate_format': np.array(args.plate_format)} for i in
-                                   np.arange(ix_chunk_start, ix_chunk_stop+1)]
-
-            chunk_data = pd.DataFrame()
-
-            if nr_processes > 1:
-                pool = mp.Pool(processes=nr_processes)
-                for res in pool.map_async(run_platometer_batch, this_jpg_files_dict).get():
-                    if res.shape[0] > 0:
-                        chunk_data = chunk_data.append(res, ignore_index=True)
-            else:
-                for im in this_jpg_files_dict:
-                    chunk_data = chunk_data.append(
-                        run_platometer_batch(im), ignore_index=True)
-
-            # Temporarily save the chunk data
-            path_to_this_chunk_file = os.path.join(
-                data_folder, format('chunk%d_data.p' % n_chunk))
-            save_to_p(chunk_data, path_to_this_chunk_file)
-
-            print('Execution time: %.2f seconds' % (time.time()-start))
-            start = time.time()
+            process_and_save_chunk(n_chunk, ix_chunk_start, ix_chunk_stop, jpg_files,
+                     jpg_files_id, args.plate_format, nr_processes, data_folder, start)
 
         # Now merge all chunks and delete the temp files
         all_data = pd.DataFrame()
