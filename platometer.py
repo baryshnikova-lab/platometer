@@ -635,6 +635,27 @@ def run_platometer_batch(image, verbose=False):
 
     return colony_data
 
+def process_folder(folder):
+    """creates the processed data folder and returns a list of image files to process"""
+
+    # Get path to the folder to contain processed data
+    current_date = datetime.datetime.today().strftime('%Y%m%d')
+    sub_folder = 'platometer_' + current_date
+    data_folder = os.path.join(folder, sub_folder)
+
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder)
+        print('Created %s' % data_folder)
+
+    # Get list of JPG files in the folder
+    jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if
+                 os.path.isfile(os.path.join(folder, f)
+                                ) and f.lower().endswith('jpg')
+                 and os.path.getsize(os.path.join(folder, f)) > 0]
+    
+    return(jpg_files, data_folder)
+
+
 def process_and_save_chunk(n_chunk, ix_chunk_start, ix_chunk_stop, jpg_files,
         jpg_files_id, plate_format, nr_processes, data_folder, start):
     """runs platometer on current chunk and saves output to a temp file"""
@@ -697,21 +718,7 @@ if __name__ == '__main__':
         folder = folder.replace('~', expanduser('~'))
         print('Processing %s' % folder)
 
-        # Get path to the folder to contain processed data
-        current_date = datetime.datetime.today().strftime('%Y%m%d')
-        sub_folder = 'platometer_' + current_date
-        data_folder = os.path.join(folder, sub_folder)
-
-        if not os.path.exists(data_folder):
-            os.makedirs(data_folder)
-            print('Created %s' % data_folder)
-
-        # Get list of JPG files in the folder
-        jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if
-                     os.path.isfile(os.path.join(folder, f)
-                                    ) and f.lower().endswith('jpg')
-                     and os.path.getsize(os.path.join(folder, f)) > 0]
-
+        jpg_files, data_folder = process_folder(folder)
         nr_jpg_files = len(jpg_files)
         jpg_files_id = np.arange(nr_jpg_files)
 
