@@ -353,7 +353,7 @@ class Platometer:
             self.detect_colonies()
             self.measure_colony_sizes()
         except RuntimeError:
-            print('RuntimeError with processing %s. Moving on...' % image['path'])
+            print('RuntimeError with processing %s. Moving on...' % self.path_to_image_file)
 
 
     def get_colony_data(self):
@@ -650,54 +650,53 @@ def run_platometer_batch(image, verbose=False):
 
     return colony_data
 
-def process_folder(folder):
+def process_folder(folder_name):
     """creates the processed data folder and returns a list of image files to process"""
 
     # Get path to the folder to contain processed data
     current_date = datetime.datetime.today().strftime('%Y%m%d')
     sub_folder = 'platometer_' + current_date
-    data_folder = os.path.join(folder, sub_folder)
+    data_folder = os.path.join(folder_name, sub_folder)
 
     if not os.path.exists(data_folder):
         os.makedirs(data_folder)
         print('Created %s' % data_folder)
 
     # Get list of JPG files in the folder
-    jpg_files = [os.path.join(folder, f) for f in os.listdir(folder) if
-                 os.path.isfile(os.path.join(folder, f)
+    jpg_files = [os.path.join(folder_name, f) for f in os.listdir(folder_name) if
+                 os.path.isfile(os.path.join(folder_name, f)
                                 ) and f.lower().endswith('jpg')
-                 and os.path.getsize(os.path.join(folder, f)) > 0]
+                 and os.path.getsize(os.path.join(folder_name, f)) > 0]
     
     return(jpg_files, data_folder)
 
 
-def process_and_save_chunk(n_chunk, ix_chunk_start, ix_chunk_stop, jpg_files,
-        jpg_files_id, plate_format, nr_processes, data_folder, start):
+def process_and_save_chunk(chunk_num, chunk_start, chunk_stop, jpg_files,
+        jpg_files_id, plate_format, n_processes, data_folder, time_start):
     """runs platometer on current chunk and saves output to a temp file"""
     
     this_jpg_files_dict = [{'path': jpg_files[i], 'file_id': jpg_files_id[i],
                             'plate_format': np.array(plate_format)} for i in
-                           np.arange(ix_chunk_start, ix_chunk_stop+1)]
+                           np.arange(chunk_start, chunk_stop+1)]
 
     chunk_data = pd.DataFrame()
 
-    if nr_processes > 1:
-        pool = mp.Pool(processes=nr_processes)
+    if n_processes > 1:
+        pool = mp.Pool(processes=n_processes)
         for res in pool.map_async(run_platometer_batch, this_jpg_files_dict).get():
             if res.shape[0] > 0:
                 chunk_data = chunk_data.append(res, ignore_index=True)
     else:
-        for im in this_jpg_files_dict:
+        for jpg_file in this_jpg_files_dict:
             chunk_data = chunk_data.append(
-                run_platometer_batch(im), ignore_index=True)
+                run_platometer_batch(jpg_file), ignore_index=True)
 
     # Temporarily save the chunk data
-    path_to_this_chunk_file = os.path.join(
-        data_folder, format('chunk%d_data.p' % n_chunk))
-    save_to_p(chunk_data, path_to_this_chunk_file)
+    path_chunk_file = os.path.join(
+        data_folder, format('chunk%d_data.p' % chunk_num))
+    save_to_p(chunk_data, path_chunk_file)
 
-    print('Execution time: %.2f seconds' % (time.time()-start))
-    start = time.time()
+    print('Execution time: %.2f seconds' % (time.time()-time_start))
 
 
 
@@ -733,9 +732,9 @@ if __name__ == '__main__':
         folder = folder.replace('~', expanduser('~'))
         print('Processing %s' % folder)
 
-        jpg_files, data_folder = process_folder(folder)
-        nr_jpg_files = len(jpg_files)
-        jpg_files_id = np.arange(nr_jpg_files)
+        jpg_file_paths, data_folder_path = process_folder(folder)
+        nr_jpg_files = len(jpg_file_paths)
+        jpg_file_ids = np.arange(nr_jpg_files)
 
         # Break the list into smaller chunks of 100 images and process the chunks sequentially
         chunk_starts = np.arange(0, nr_jpg_files, CHUNK_SIZE)
@@ -748,30 +747,30 @@ if __name__ == '__main__':
             print('Chunk %d of %d, start %d, stop %d' % (n_chunk, len(chunk_starts),
                                                  ix_chunk_start, ix_chunk_stop))
 
-            process_and_save_chunk(n_chunk, ix_chunk_start, ix_chunk_stop, jpg_files,
-                     jpg_files_id, args.plate_format, nr_processes, data_folder, start)
-
+            process_and_save_chunk(n_chunk, ix_chunk_start, ix_chunk_stop, jpg_file_paths,
+                     jpg_file_ids, args.plate_format, nr_processes, data_folder_path, start)
+            start = time.time()
         # Now merge all chunks and delete the temp files
         all_data = pd.DataFrame()
 
         for n_chunk, ix_chunk in enumerate(chunk_starts):
 
             path_to_this_chunk_file = os.path.join(
-                data_folder, format('chunk%d_data.p' % n_chunk))
-            chunk_data = load(path_to_this_chunk_file, verbose=False)
-            all_data = all_data.append(chunk_data, ignore_index=True)
+                data_folder_path, format('chunk%d_data.p' % n_chunk))
+            chunk_dataframe = load(path_to_this_chunk_file, verbose=False)
+            all_data = all_data.append(chunk_dataframe, ignore_index=True)
 
             # Remove the temp "chunk" file
             os.remove(path_to_this_chunk_file)
 
-        print('Printing data to %s' % data_folder)
+        print('Printing data to %s' % data_folder_path)
 
         # Print all data
-        path_to_all_data_file = os.path.join(data_folder, 'all_data.txt')
+        path_to_all_data_file = os.path.join(data_folder_path, 'all_data.txt')
         all_data.to_csv(path_to_all_data_file, sep='\t', index=False)
 
         # Print the file_id to path map
         jpg_map = pd.DataFrame(
-            data={'path': jpg_files, 'file_id': jpg_files_id})
-        path_to_jpg_map_file = os.path.join(data_folder, 'jpg_map.txt')
+            data={'path': jpg_file_paths, 'file_id': jpg_file_ids})
+        path_to_jpg_map_file = os.path.join(data_folder_path, 'jpg_map.txt')
         jpg_map.to_csv(path_to_jpg_map_file, sep='\t', index=False)
