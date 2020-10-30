@@ -101,11 +101,17 @@ class Platometer:
             print('Saving to %s.' % path_to_p_file)
 
         # (Hacky) Remove the fit_sin lambda to allow pickle to be used
+        fit_row = self.fit_row
+        fit_col = self.fit_col
+
         del self.fit_row['fitfunc']
         del self.fit_col['fitfunc']
 
         with open(path_to_p_file, 'wb') as file_handle:
             pickle.dump(self, file_handle)
+
+        self.fit_row = fit_row
+        self.fit_col = fit_col
 
     def print(self, path='', verbose=False):
         """Prints the quantified colony size data into a text file.
