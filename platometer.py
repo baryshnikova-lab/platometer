@@ -334,6 +334,22 @@ class Platometer:
 
         self.colony_data = colony_data
 
+    def process(self):
+        """Runs Platometer on an image.
+        Args:
+            image (dict): A dictionary containing the path to the image and other parameters.
+        Returns:
+            Platometer: The Platometer instance containing inputs and outputs of image processing.
+        """
+
+        try:
+            self.gray_and_trim()
+            self.detect_colonies()
+            self.measure_colony_sizes()
+        except RuntimeError:
+            print('RuntimeError with processing %s. Moving on...' % image['path'])
+
+
     def get_colony_data(self):
         """Returns the quantified colony size data.
         """
@@ -597,14 +613,7 @@ def run_platometer(image, save_to_file=False, verbose=True):
     image_path = image['path'].replace('~', expanduser('~'))
     plat = Platometer(
         image_path, plate_format=image['plate_format'], verbose=verbose)
-
-    try:
-        plat.gray_and_trim()
-        plat.detect_colonies()
-        plat.measure_colony_sizes()
-    except RuntimeError:
-        print('RuntimeError with processing %s. Moving on...' % image['path'])
-
+    plat.process()
     # Saves the object to pickle
     if save_to_file:
         plat.save()
