@@ -38,8 +38,6 @@ def load(file_path, version=3, verbose=True):
         obj: The contents of the input file.
     """
 
-    # home = expanduser('~')
-    # file_path = re.sub('~', home, file_path)
 
     [_, file_extension] = os.path.splitext(file_path)
 
@@ -117,9 +115,6 @@ def plot_plate(data, colorbar=False, **kwargs):
                    vmin=vmin, vmax=vmax)
 
     axes.set_aspect('equal')
-    #     axes.set_xlim(-1, 48)
-    #     axes.set_ylim(-1, 32)
-    #     axes.invert_yaxis()
     axes.grid(False)
 
     if ~xticklabels:

@@ -59,7 +59,7 @@ For each processed folder containing images, Platometer generates 2 files:
 - jpg_map.txt: contains the list of processed files and their paths 
 - all_data.txt: contains the processed data, i.e. colony size quantification for each colony (row, column) position on the plate. 
 
-For more information, see `examples/Usage_examples.ipynb`.
+These files will be placed in an output directory called `platometer_$DATE` (e.g. `platometer_20201012`). For more information, including sample images, see `examples/Usage_examples.ipynb`.
 
 HELP
 ====
