@@ -56,8 +56,24 @@ python platometer.py examples/folders_to_process.txt
 
 For each processed folder containing images, Platometer generates 2 files: 
 
-- jpg_map.txt: contains the list of processed files and their paths 
-- all_data.txt: contains the processed data, i.e. colony size quantification for each colony (row, column) position on the plate. 
+1. jpg_map.txt: contains the list of processed files and their paths
+
+|Column name|Description|
+|-|-|
+|path|Paths of the images|
+|file_id|File IDs|
+
+3. all_data.txt: contains the processed data, i.e. colony size quantification for each colony (row, column) position on the plate. 
+
+|Column name|Description|
+|-|-|
+|file_id|File IDs|
+|label|Colony IDs|
+|col|Column #s of colonies|
+|row|Row #s of colonies|
+|size|Sizes of colonies|
+|col_pxl|Horizontal (x) pixel positions of colonies|
+|row_pxl|Vertical (y) pixel positions of colonies|
 
 These files will be placed in an output directory called `platometer_$DATE` (e.g. `platometer_20201012`). For more information, including sample images, see `examples/Usage_examples.ipynb`.
 
